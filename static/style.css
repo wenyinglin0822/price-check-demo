@@ -1,4 +1,3 @@
-/* 全域字體與底色 */
 * {
     box-sizing: border-box;
     font-family: "Microsoft JhengHei", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -6,111 +5,72 @@
 
 body {
     margin: 0;
-    background: #f2f2f2;
+    background: #f5f5f5;
     color: #222;
 }
 
-/* 外框：模擬手機畫面置中 */
 .page {
-    max-width: 480px;
-    margin: 0 auto;
-    min-height: 100vh;
-    background: #f7f7f7;
-    display: flex;
-    flex-direction: column;
+    max-width: 960px;
+    margin: 32px auto;
+    padding: 24px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* 頂部抬頭（新興行 / 店內查價系統） */
-.app-header {
-    background: #f3f4f6;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 14px 12px 10px;
+h1 {
+    margin-top: 0;
+    margin-bottom: 24px;
+    font-size: 28px;
     text-align: center;
 }
 
-.shop-name {
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: 2px;
-}
+/* --- 查詢區 --- */
 
-.app-subtitle {
-    margin-top: 4px;
-    font-size: 16px;
-    color: #666;
-}
-
-/* 內容區 */
-.app-body {
-    padding: 12px 12px 20px;
-    flex: 1;
-}
-
-/* 查詢區 */
-.search-panel {
-    margin-bottom: 10px;
-}
-
-.search-label {
+.search-panel label {
     display: block;
-    font-size: 14px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    font-size: 15px;
 }
 
 .search-row {
     display: flex;
-    margin-bottom: 8px;
+    gap: 8px;
 }
 
 #barcode-input {
     flex: 1;
-    padding: 9px 10px;
+    padding: 10px 12px;
     font-size: 16px;
-    border-radius: 6px;
-    border: 1px solid #b7b7b7;
-    outline: none;
+    border: 1px solid #ccc;
+    border-radius: 8px;
 }
 
-#barcode-input:focus {
-    border-color: #1a73e8;
-    box-shadow: 0 0 0 1px rgba(26,115,232,0.35);
-}
-
-/* 查詢 + 掃描按鈕（兩個橫排） */
-.search-button-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.btn-primary,
-.btn-scan {
-    flex: 1;
-    padding: 10px 0;
-    font-size: 16px;
+button {
+    padding: 10px 16px;
+    font-size: 15px;
+    border-radius: 8px;
     border: none;
-    border-radius: 6px;
     cursor: pointer;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
     transition: transform 0.05s ease, box-shadow 0.1s ease;
 }
 
-.btn-primary {
-    background: #1a73e8;
-}
-
-.btn-scan {
-    background: #059669;
-}
-
-.btn-primary:hover,
-.btn-scan:hover {
+button:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+#btn-search {
+    background: #1a73e8;
+    color: #fff;
+}
+
+#btn-scan {
+    background: #00a572;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .icon-camera {
@@ -118,77 +78,28 @@ body {
 }
 
 .support-note {
-    margin-top: 4px;
-    font-size: 12px;
+    margin-top: 6px;
+    font-size: 13px;
     color: #666;
 }
 
-/* 🔸 新增：Session 倒數計時顯示 */
-.session-timer {
-    margin-top: 2px;
-    font-size: 12px;
-    color: #888;
-    text-align: right;
-}
+/* --- 查價結果 --- */
 
-/* 中間 DEMO 區 */
-.demo-section {
-    margin: 10px 0 14px;
-}
-
-/* 大圖：桃色背景 + 綠框（模擬你圖上的感覺） */
-.demo-photo-main {
-    width: 100%;
-    height: 230px;
-    background: #fbe2c6;
-    border-radius: 0;
-    border: 3px solid #22c55e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.demo-photo-text {
-    font-size: 28px;
-    font-weight: 500;
-    letter-spacing: 1px;
-}
-
-/* 下方三個小按鈕：圖1 / 圖2 / 圖3 */
-.demo-thumb-row {
-    display: flex;
-    justify-content: flex-start;
-    gap: 8px;
-    margin-top: 4px;
-}
-
-.demo-thumb {
-    flex: 0 0 70px;
-    padding: 6px 0;
-    font-size: 14px;
-    border-radius: 6px;
-    border: 1px solid #d4d4d4;
-    background: #f9fafb;
-    cursor: pointer;
-}
-
-.demo-thumb.active {
-    border-color: #1d4ed8;
-    background: #e0edff;
-}
-
-/* 查價結果卡片 */
 .result-panel {
-    margin-top: 8px;
-    padding: 14px 12px 10px;
+    margin-top: 24px;
+    padding: 18px 20px;
     border-radius: 10px;
     background: #f3f8ff;
     border: 1px solid #c6ddff;
 }
 
-.result-header {
-    font-size: 16px;
+.result-title {
     font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.result-main {
     margin-bottom: 6px;
 }
 
@@ -198,30 +109,39 @@ body {
     margin-bottom: 4px;
 }
 
-.result-row {
+.result-price-row {
     font-size: 15px;
     margin-top: 4px;
 }
 
-.result-row.small {
-    font-size: 14px;
-}
-
 .result-label {
-    color: #666;
+    color: #555;
 }
 
 .result-price {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 800;
     color: #d32f2f;
     margin-left: 4px;
 }
 
-/* 錯誤訊息 */
+.result-unit {
+    margin-left: 4px;
+    color: #333;
+    font-size: 14px;
+}
+
+.result-extra {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #666;
+}
+
+/* --- 錯誤訊息 --- */
+
 .error-panel {
-    margin-top: 10px;
-    padding: 10px 12px;
+    margin-top: 20px;
+    padding: 12px 14px;
     border-radius: 8px;
     background: #ffebee;
     border: 1px solid #ffcdd2;
@@ -229,16 +149,8 @@ body {
     font-size: 14px;
 }
 
-/* 底部備註 */
-.app-footer {
-    margin-top: 14px;
-    padding-top: 10px;
-    font-size: 12px;
-    color: #777;
-    text-align: center;
-}
+/* --- 掃描 overlay --- */
 
-/* 掃描 overlay（沿用原本邏輯，只是改一點外觀） */
 .hidden {
     display: none !important;
 }
@@ -246,7 +158,7 @@ body {
 .scanner-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -254,11 +166,11 @@ body {
 }
 
 .scanner-box {
-    width: min(480px, 95vw);
+    width: min(900px, 95vw);
     max-height: 90vh;
     background: #0f172a;
     border-radius: 16px;
-    padding: 10px 14px 14px;
+    padding: 12px 16px 16px;
     color: #e5e7eb;
     display: flex;
     flex-direction: column;
@@ -268,27 +180,24 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
-    font-size: 14px;
+    margin-bottom: 8px;
+    font-size: 15px;
 }
 
 .btn-close {
     background: #f97373;
     color: #fff;
-    padding: 4px 10px;
-    font-size: 13px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
+    padding: 6px 12px;
+    font-size: 14px;
 }
 
 .scanner-video-wrapper {
     position: relative;
     background: #000;
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
     flex: 1;
-    min-height: 240px;
+    min-height: 260px;
 }
 
 .scanner-video {
@@ -296,29 +205,35 @@ body {
     height: 100%;
 }
 
-/* 綠框 */
+/* 綠框（取景區） */
 .scanner-frame {
     position: absolute;
-    inset: 12%;
+    inset: 15%;
     border: 3px solid #22c55e;
     border-radius: 10px;
     pointer-events: none;
 }
 
 .scanner-tip {
-    margin-top: 8px;
-    font-size: 12px;
+    margin-top: 10px;
+    font-size: 13px;
     color: #cbd5f5;
     text-align: center;
 }
 
-/* 小螢幕再縮一點邊距 */
-@media (max-width: 400px) {
-    .app-body {
-        padding-inline: 8px;
+/* RWD */
+@media (max-width: 640px) {
+    .page {
+        margin: 8px;
+        padding: 16px;
     }
-    .demo-photo-main {
-        height: 210px;
+    h1 {
+        font-size: 22px;
+    }
+    .search-row {
+        flex-direction: column;
+    }
+    #btn-search, #btn-scan {
+        width: 100%;
     }
 }
-
