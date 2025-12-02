@@ -2,134 +2,72 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>店內查價系統（手機可掃碼）</title>
+
     <link rel="stylesheet" href="/static/style.css">
+
+    <!-- 直接用官方 CDN 載入 QuaggaJS -->
+    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 </head>
-
 <body>
-    <div class="app-container">
-        <header class="app-header">
-            <h1 class="app-title">店內查價系統（手機可掃碼）</h1>
-        </header>
+<div class="page">
+    <h1>店內查價系統（手機可掃碼）</h1>
 
-        <section class="search-section">
-            <div class="input-group">
-                <label class="input-label">請輸入或掃描商品條碼：</label>
-                <input id="barcode-input" type="text" class="barcode-input" autocomplete="off">
-            </div>
-
-            <div class="button-row">
-                <button id="search-btn" class="btn primary">查詢</button>
-                <button id="scan-btn" class="btn accent">📷 掃描條碼</button>
-            </div>
-
-            <div class="support-note">
-                支援：EAN-13 / EAN-8 / UPC / Code128 / QRCode
-            </div>
-        </section>
-
-        <section class="demo-section">
-            <div id="demo-panel" class="demo-panel">
-                <div id="demo-content" class="demo-content">DEMO 左</div>
-            </div>
-            <div class="demo-buttons">
-                <button class="btn demo-btn active" data-demo="left">圖 1</button>
-                <button class="btn demo-btn" data-demo="center">圖 2</button>
-                <button class="btn demo-btn" data-demo="right">圖 3</button>
-            </div>
-        </section>
-
-        <section class="result-section">
-            <div id="result-panel" class="result-panel"></div>
-        </section>
-    </div>
-
-    <!-- 條碼掃描 UI -->
-    <div id="scanner-overlay" class="scanner-overlay" style="display:none;">
-        <div class="scanner-dialog">
-            <div class="scanner-header">
-                <span>請將條碼對準畫面中線</span>
-                <button id="close-scanner-btn" class="close-btn">✕</button>
-            </div>
-            <div id="scanner-area" class="scanner-area">
-                <video id="scanner-video" class="scanner-video" autoplay muted playsinline></video>
-                <div class="scanner-line"></div>
-            </div>
+    <div class="search-panel">
+        <label for="barcode-input">請輸入或掃描商品條碼：</label>
+        <div class="search-row">
+            <input id="barcode-input" type="text" placeholder="請輸入 EAN13 / UPC / Code128 條碼">
+            <button id="btn-search">查詢</button>
+            <button id="btn-scan">
+                <span class="icon-camera">📷</span>
+                掃描條碼
+            </button>
+        </div>
+        <div class="support-note">
+            支援：EAN-13 / EAN-8 / UPC / Code128 / QRCode（QRCode 僅顯示內容）
         </div>
     </div>
 
-    <!-- 必須用絕對路徑（Render 才抓得到） -->
-    <script src="/static/quagga.min.js"></script>
-    <script src="/static/script.js"></script>
+    <!-- 查價結果 -->
+    <div id="result-panel" class="result-panel hidden">
+        <div class="result-title">查價結果</div>
+        <div class="result-main">
+            <div class="result-name" id="res-name">—</div>
+            <div class="result-price-row">
+                <span class="result-label">條碼：</span>
+                <span id="res-barcode">—</span>
+            </div>
+            <div class="result-price-row">
+                <span class="result-label">未稅單價：</span>
+                <span class="result-price" id="res-price">—</span>
+                <span class="result-unit" id="res-unit"></span>
+            </div>
+        </div>
+        <div class="result-extra" id="res-extra"></div>
+    </div>
 
-    <!-- 登入 + Session 控制 -->
-    <script>
-    (function(){
-        const KEY="priceCheckExpire";
-        const LIFE=30*60*1000;
+    <!-- 錯誤訊息 -->
+    <div id="error-panel" class="error-panel hidden"></div>
 
-        function todayCode(){
-            const d=new Date();
-            return (d.getMonth()+1)*100 + d.getDate() + 1234;
-        }
+    <!-- 掃描區（覆蓋全畫面） -->
+    <div id="scanner-overlay" class="scanner-overlay hidden">
+        <div class="scanner-box">
+            <div class="scanner-header">
+                <span>相機掃描模式（支援 EAN-13 / QRCode）</span>
+                <button id="btn-close-scan" class="btn-close">關閉</button>
+            </div>
+            <div class="scanner-video-wrapper">
+                <div id="scanner" class="scanner-video"></div>
+                <div class="scanner-frame"></div>
+            </div>
+            <div class="scanner-tip">
+                請將條碼置於綠色框線中央，系統會自動辨識。<br>
+                若無法啟用相機，請改用手機開啟本站或改用手動輸入。
+            </div>
+        </div>
+    </div>
+</div>
 
-        function countdown(expire){
-            const el=document.createElement("div");
-            el.style.position="fixed";
-            el.style.right="10px";
-            el.style.bottom="10px";
-            el.style.background="#fff";
-            el.style.border="1px solid #ccc";
-            el.style.padding="5px 12px";
-            el.style.borderRadius="6px";
-            el.style.fontSize="12px";
-            el.style.zIndex="9999";
-            document.body.appendChild(el);
-
-            function tick(){
-                const now=Date.now();
-                const diff=expire-now;
-                if(diff<=0){
-                    sessionStorage.removeItem(KEY);
-                    alert("使用時間已到，請重新輸入密碼");
-                    location.reload();
-                    return;
-                }
-                const sec=Math.floor(diff/1000);
-                const mm=String(Math.floor(sec/60)).padStart(2,"0");
-                const ss=String(sec%60).padStart(2,"0");
-                el.textContent=`剩餘時間：${mm}:${ss}`;
-            }
-            tick();
-            setInterval(tick,1000);
-        }
-
-        function ensureLogin(){
-            const now=Date.now();
-            const expire=Number(sessionStorage.getItem(KEY)||0);
-            if(expire>now){ countdown(expire); return; }
-
-            while(true){
-                const p=prompt("請輸入密碼");
-                if(p===null){
-                    alert("未輸入密碼，已離開系統");
-                    location.href="about:blank";
-                    return;
-                }
-                if(p.trim()===String(todayCode())){
-                    const ex=Date.now()+LIFE;
-                    sessionStorage.setItem(KEY,ex);
-                    countdown(ex);
-                    return;
-                }
-                alert("密碼錯誤，請再試一次");
-            }
-        }
-
-        window.addEventListener("load",ensureLogin);
-    })();
-    </script>
-
+<script src="/static/script.js"></script>
 </body>
 </html>

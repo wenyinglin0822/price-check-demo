@@ -1,5 +1,5 @@
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import sqlite3
@@ -14,54 +14,36 @@ def home():
     return FileResponse("index.html")
 
 @app.get("/api/price")
-def get_price(barcode: str = Query(..., min_length=1, max_length=64)):
-    barcode = barcode.strip()
-    if not barcode:
-        raise HTTPException(status_code=400, detail="條碼不可為空白")
-
+def get_price(barcode: str):
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
     try:
-        cur = conn.cursor()
-        cur.execute(
-            '''
-            SELECT
-                p.item_no,
-                p.product_name,
-                p.price_excl_tax,
-                COALESCE(p.unit, '') AS unit
-            FROM products p
-            JOIN product_barcodes b
-              ON p.id = b.product_id
-            WHERE b.barcode = ?
-              AND p.is_active = 1
-            ORDER BY
-              b.is_primary DESC,
-              p.updated_at DESC
-            LIMIT 1
-            ''',
-            (barcode,),
-        )
+        cur.execute("SELECT product_id FROM product_barcodes WHERE barcode=?", (barcode,))
         row = cur.fetchone()
-        if row is None:
-            return {
-                "success": False,
-                "message": "查無此條碼對應的商品，請確認條碼是否正確。",
-            }
+        if not row:
+            raise HTTPException(404, "查無此條碼")
+        pid = row[0]
 
-        unit = (row["unit"] or "").strip()
-        if unit.lower() == "nan":
-            unit = ""
+        cur.execute("""
+            SELECT item_no, product_name, price_excl_tax, unit
+            FROM products
+            WHERE id=?
+        """, (pid,))
+        p = cur.fetchone()
+        if not p:
+            raise HTTPException(404, "產品主檔不存在")
 
+        item_no, name, price, unit = p
         return {
             "success": True,
             "barcode": barcode,
-            "item_no": row["item_no"],
-            "product_name": row["product_name"],
-            "price_excl_tax": row["price_excl_tax"],
-            "unit": unit,
+            "item_no": item_no,
+            "product_name": name,
+            "price_excl_tax": price,
+            "unit": unit
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))
     finally:
         conn.close()
