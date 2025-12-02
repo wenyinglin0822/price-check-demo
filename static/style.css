@@ -123,6 +123,14 @@ body {
     color: #666;
 }
 
+/* 🔸 新增：Session 倒數計時顯示 */
+.session-timer {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #888;
+    text-align: right;
+}
+
 /* 中間 DEMO 區 */
 .demo-section {
     margin: 10px 0 14px;
@@ -313,3 +321,4 @@ body {
         height: 210px;
     }
 }
+
