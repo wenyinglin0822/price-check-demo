@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <title>店內查價系統</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <!-- QuaggaJS：條碼掃描 -->
+    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+</head>
+<body>
+<div class="page">
+
+    <!-- 頂部抬頭 -->
+    <header class="app-header">
+        <div class="shop-name">新興行</div>
+        <div class="app-subtitle">店內查價系統</div>
+    </header>
+
+    <!-- 內容區 -->
+    <main class="app-body">
+
+        <!-- 查詢區 -->
+        <section class="search-panel">
+            <label for="barcode-input" class="search-label">請輸入或掃描商品條碼：</label>
+            <div class="search-row">
+                <input
+                    id="barcode-input"
+                    type="text"
+                    placeholder="請輸入 EAN-13 / UPC / Code128 條碼"
+                    autocomplete="off"
+                />
+            </div>
+            <div class="search-button-row">
+                <button id="btn-search" class="btn-primary">查詢</button>
+                <button id="btn-scan" class="btn-scan">
+                    <span class="icon-camera">📷</span>
+                    掃描條碼
+                </button>
+            </div>
+            <div class="support-note">
+                支援：EAN-13 / EAN-8 / UPC / Code128 / QRCode（QRCode 僅顯示內容）
+            </div>
+        </section>
+
+        <!-- 中間 DEMO 圖片區 -->
+        <section class="demo-section">
+            <div class="demo-photo-main" id="demo-photo-main">
+                <span class="demo-photo-text" id="demo-photo-text">Demo 左</span>
+            </div>
+            <div class="demo-thumb-row">
+                <button class="demo-thumb active" data-index="0">圖 1</button>
+                <button class="demo-thumb" data-index="1">圖 2</button>
+                <button class="demo-thumb" data-index="2">圖 3</button>
+            </div>
+        </section>
+
+        <!-- 查價結果 -->
+        <section id="result-panel" class="result-panel hidden">
+            <div class="result-header">查價結果</div>
+            <div class="result-main">
+                <div class="result-name" id="res-name">—</div>
+                <div class="result-row">
+                    <span class="result-label">條碼：</span>
+                    <span id="res-barcode">—</span>
+                </div>
+                <div class="result-row">
+                    <span class="result-label">未稅單價：</span>
+                    <span class="result-price" id="res-price">—</span>
+                </div>
+                <div class="result-row small">
+                    <span class="result-label">料號：</span>
+                    <span id="res-extra"></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 錯誤訊息 -->
+        <div id="error-panel" class="error-panel hidden"></div>
+
+        <!-- 底部備註 -->
+        <footer class="app-footer">
+            本系統顯示價格均為 <strong>未稅價</strong>，結帳需加計營業稅。<br/>
+            僅限店內使用，實際金額以收銀結帳為準。
+        </footer>
+    </main>
+
+    <!-- 掃描 overlay -->
+    <div id="scanner-overlay" class="scanner-overlay hidden">
+        <div class="scanner-box">
+            <div class="scanner-header">
+                <span>相機掃描模式（支援 EAN-13 / QRCode）</span>
+                <button id="btn-close-scan" class="btn-close">關閉</button>
+            </div>
+            <div class="scanner-video-wrapper">
+                <div id="scanner" class="scanner-video"></div>
+                <div class="scanner-frame"></div>
+            </div>
+            <div class="scanner-tip">
+                請將條碼置於綠色框線中央，系統會自動辨識。<br />
+                若無法啟用相機，請改用手機開啟本站或改用手動輸入。
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>
