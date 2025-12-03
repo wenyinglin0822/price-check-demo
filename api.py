@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import sqlite3
 import time
+import re
 from datetime import datetime, timedelta
 
 app = FastAPI()
@@ -129,6 +130,73 @@ def get_price(barcode: str, request: Request):
             "price_excl_tax": row["price_excl_tax"],
             "unit": row["unit"]
         }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@app.get("/api/search")
+def search_products(q: str, request: Request):
+    """商品模糊搜尋 API（依商品名稱關鍵字）"""
+    ensure_session(request)
+
+    query = (q or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="empty_query")
+
+    # 將全形逗號轉成半形，再依逗號與空白分割
+    normalized = query.replace("，", ",")
+    parts = [p.strip() for p in re.split(r"[\s,]+", normalized) if p.strip()]
+    if not parts:
+        raise HTTPException(status_code=400, detail="empty_query")
+
+    # 動態組 WHERE 條件：所有關鍵字都要出現在品名中
+    where_clauses = []
+    params = []
+    for kw in parts:
+        where_clauses.append("p.product_name LIKE ?")
+        params.append(f"%{kw}%")
+
+    where_sql = " AND ".join(where_clauses)
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        sql = f"""
+            SELECT
+                b.barcode,
+                p.product_name,
+                p.price_excl_tax,
+                p.unit
+            FROM product_barcodes b
+            JOIN products p ON p.id = b.product_id
+            WHERE {where_sql}
+            ORDER BY p.product_name
+            LIMIT 30
+        """
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+        items = [
+            {
+                "barcode": row["barcode"],
+                "product_name": row["product_name"],
+                "price_excl_tax": row["price_excl_tax"],
+                "unit": row["unit"],
+            }
+            for row in rows
+        ]
+
+        if not items:
+            return {
+                "success": False,
+                "message": "查無符合的商品，請嘗試其他關鍵字。",
+                "items": [],
+            }
+
+        return {"success": True, "items": items}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -12,7 +12,7 @@
 
     <!-- 頂部抬頭 -->
     <header class="app-header">
-        <div class="shop-name">新興行</div>
+        <div class="shop-name">新順興行</div>
         <div class="app-subtitle">店內查價系統</div>
     </header>
 
@@ -26,7 +26,7 @@
                 <input
                     id="barcode-input"
                     type="text"
-                    placeholder="請輸入 EAN-13 / UPC / Code128 條碼"
+                    placeholder="可輸入條碼或關鍵字，例如：夾鏈、夾鏈袋 6號…"
                     autocomplete="off"
                 />
             </div>
@@ -77,6 +77,26 @@
                     <span id="res-extra"></span>
                 </div>
             </div>
+        </section>
+
+        <!-- 關鍵字搜尋結果列表 -->
+        <section id="search-result-panel" class="result-panel hidden">
+            <div class="result-header">關鍵字搜尋結果</div>
+            <div class="search-result-note">點選下列任一商品即可載入詳細查價。</div>
+            <table class="search-result-table" id="search-result-table">
+                <thead>
+                    <tr>
+                        <th>品名</th>
+                        <th>條碼</th>
+                        <th>未稅單價</th>
+                    </tr>
+                </thead>
+                <tbody id="search-result-body">
+                    <tr>
+                        <td colspan="3" style="text-align:center;padding:8px 0;">尚無搜尋結果</td>
+                    </tr>
+                </tbody>
+            </table>
         </section>
 
         <!-- 錯誤訊息 -->
