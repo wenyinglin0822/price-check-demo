@@ -1,204 +1,281 @@
-from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+import os
+from typing import List, Optional, Any, Dict
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import sqlite3
-import time
-import re
-from datetime import datetime, timedelta
+from fastapi.responses import HTMLResponse
 
-app = FastAPI()
-DB_PATH = "price.db"
+from pydantic import BaseModel, Field
 
-# Session 時效：30 分鐘
-SESSION_DURATION = 30 * 60  # 1800 秒
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
+import psycopg
+from psycopg.rows import dict_row
+from psycopg.types.json import Json
 
 
-def get_daily_password() -> str:
-    """
-    今日密碼：
-    台灣時間 MMDD → 轉成整數後加上 1234 → 再轉回字串
-    例如：1202 + 1234 = 2436
-    """
-    now = datetime.utcnow() + timedelta(hours=8)  # 台灣時間
-    mmdd = int(now.strftime("%m%d"))  # 轉成整數，例如 1202
-    password = mmdd + 1234
-    return str(password)
+# =========================
+# Config
+# =========================
+APP_TITLE = "price-check-order-clean"
+STATIC_DIR = "static"          # repo 根目錄下的 static/
+ORDERS_TABLE = "orders"
+
+def get_database_url() -> str:
+    # Render 建議用 DATABASE_URL（你已配置）
+    url = (os.getenv("DATABASE_URL") or "").strip()
+    if not url:
+        raise RuntimeError("DATABASE_URL not set in Render Environment Variables.")
+    return url
 
 
-def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-@app.get("/")
-def home():
-    return FileResponse("index.html")
-
-
-@app.post("/api/login")
-async def login(data: dict, response: Response):
-    """
-    檢查每日密碼 + 建立 30 分鐘 session。
-    前端會呼叫本 API 並送出 {"password": "..."}。
-    """
-    password = (data or {}).get("password", "").strip()
-    if not password:
-        raise HTTPException(status_code=400, detail="empty_password")
-
-    expected = get_daily_password()
-    if password != expected:
-        raise HTTPException(status_code=401, detail="invalid_password")
-
-    expires_at = int(time.time()) + SESSION_DURATION
-
-    resp = JSONResponse({
-        "success": True,
-        "expires_at": expires_at
-    })
-
-    resp.set_cookie(
-        key="session_exp",
-        value=str(expires_at),
-        max_age=SESSION_DURATION,
-        httponly=True,
-        samesite="lax"
+def get_conn():
+    # Supabase 通常需要 sslmode=require；即便 URL 已帶，也不會壞
+    return psycopg.connect(
+        get_database_url(),
+        sslmode="require",
+        row_factory=dict_row,
     )
 
-    return resp
+
+# =========================
+# App (app 一定要先建立)
+# =========================
+app = FastAPI(title=APP_TITLE, version="1.0.0")
+
+# CORS：先放寬，避免前端被擋；穩定後再收緊 allow_origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ✅ static 掛載：必須在 app 定義後
+# ✅ directory="static"：對應 GitHub repo 根目錄 /static
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-def ensure_session(request: Request):
+# =========================
+# Models (Swagger 會出 Request body)
+# =========================
+class OrderItem(BaseModel):
+    barcode: Optional[str] = None
+    name: Optional[str] = None
+    unit: Optional[str] = None
+    qty: float = 1
+    price: float = 0
+    subtotal: Optional[float] = None
+
+
+class CreateOrderRequest(BaseModel):
+    items: List[OrderItem] = Field(default_factory=list)
+    note: Optional[str] = None
+    shop_name: Optional[str] = None
+
+
+class UpdateStatusRequest(BaseModel):
+    status: str = Field(..., description="NEW / PAID / DONE / CANCELED / RETURN")
+
+
+class PriceCheckItem(BaseModel):
+    barcode: str
+    qty: float = 1
+
+
+class PriceCheckRequest(BaseModel):
+    items: List[PriceCheckItem] = Field(default_factory=list)
+
+
+# =========================
+# Helpers
+# =========================
+def calc_totals(items: List[OrderItem]) -> Dict[str, Any]:
+    total_qty = 0.0
+    total_amount = 0.0
+
+    norm_items = []
+    for it in items:
+        q = float(it.qty or 0)
+        p = float(it.price or 0)
+        s = float(it.subtotal) if it.subtotal is not None else q * p
+        total_qty += q
+        total_amount += s
+
+        norm_items.append({
+            "barcode": it.barcode,
+            "name": it.name,
+            "unit": it.unit,
+            "qty": q,
+            "price": p,
+            "subtotal": s,
+        })
+
+    return {
+        "items": norm_items,
+        "total_qty": int(total_qty) if float(total_qty).is_integer() else total_qty,
+        "total_amount": total_amount,
+    }
+
+
+# =========================
+# Routes
+# =========================
+@app.get("/", response_class=HTMLResponse)
+def home():
+    # 讓根網址不要再 404，並指引你去測試
+    return f"""
+    <html>
+      <body style="font-family: Arial; padding: 16px;">
+        <h3>{APP_TITLE}</h3>
+        <ul>
+          <li><a href="/docs">API Docs (Swagger)</a></li>
+          <li><a href="/health">Health</a></li>
+          <li><a href="/static/order.html">Customer Order Page</a></li>
+        </ul>
+      </body>
+    </html>
     """
-    session_exp cookie 有效就放行，失效則丟 401。
-    """
-    exp = request.cookies.get("session_exp")
-    now = int(time.time())
 
-    if not exp:
-        raise HTTPException(status_code=401, detail="no_session")
+
+@app.get("/health")
+def health():
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("select 1 as ok;")
+                row = cur.fetchone()
+        return {"ok": True, "db": "ok", "check": row}
+    except Exception as e:
+        return {"ok": False, "db": "fail", "error": str(e)}
+
+
+# 顧客端：查價（目前先做「回傳」，未接商品主檔）
+@app.post("/api/price-check")
+def price_check(payload: PriceCheckRequest):
+    # 先讓前端流程跑通：回傳你送的 items
+    return {"success": True, "items": [it.model_dump() for it in payload.items]}
+
+
+# 顧客端：建立訂單（寫 Supabase）
+@app.post("/api/orders")
+def create_order(payload: CreateOrderRequest):
+    if not payload.items:
+        raise HTTPException(status_code=422, detail="items is empty")
+
+    totals = calc_totals(payload.items)
+
+    # ✅ jsonb 正確寫法：Json(dict/list)
+    items_jsonb = Json(totals["items"])
+    raw_jsonb = Json(payload.model_dump())
 
     try:
-        if int(exp) < now:
-            raise HTTPException(status_code=401, detail="session_expired")
-    except ValueError:
-        raise HTTPException(status_code=401, detail="session_expired")
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    insert into {ORDERS_TABLE}
+                      (items, total_qty, total_amount, status, note, shop_name, raw_json)
+                    values
+                      (%s, %s, %s, %s, %s, %s, %s)
+                    returning id, created_at, status, total_qty, total_amount
+                    """,
+                    (
+                        items_jsonb,
+                        totals["total_qty"],
+                        totals["total_amount"],
+                        "NEW",
+                        payload.note,
+                        payload.shop_name,
+                        raw_jsonb,
+                    ),
+                )
+                row = cur.fetchone()
+                conn.commit()
+
+        return {"success": True, **row}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB insert failed: {e}")
 
 
-@app.get("/api/price")
-def get_price(barcode: str, request: Request):
-    """查價 API，需要有效 session"""
-    ensure_session(request)
+# 管理端：訂單列表（先不做登入，之後再鎖）
+@app.get("/api/orders")
+def list_orders(limit: int = 50, offset: int = 0):
+    limit = max(1, min(int(limit), 200))
+    offset = max(0, int(offset))
 
-    barcode = (barcode or "").strip()
-    if not barcode:
-        raise HTTPException(status_code=400, detail="empty_barcode")
-
-    conn = get_db_connection()
     try:
-        cur = conn.cursor()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    select id, created_at, status, total_qty, total_amount, note, shop_name, items
+                    from {ORDERS_TABLE}
+                    order by id desc
+                    limit %s offset %s
+                    """,
+                    (limit, offset),
+                )
+                rows = cur.fetchall()
 
-        cur.execute(
-            """
-            SELECT
-                p.item_no,
-                p.product_name,
-                p.price_excl_tax,
-                p.unit
-            FROM product_barcodes b
-            JOIN products p ON p.id = b.product_id
-            WHERE b.barcode = ?
-            LIMIT 1
-            """,
-            (barcode,)
-        )
+        return {"success": True, "count": len(rows), "rows": rows}
 
-        row = cur.fetchone()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB query failed: {e}")
+
+
+# 管理端：單筆訂單
+@app.get("/api/orders/{order_id}")
+def get_order(order_id: int):
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    select id, created_at, status, total_qty, total_amount, note, shop_name, items, raw_json
+                    from {ORDERS_TABLE}
+                    where id = %s
+                    """,
+                    (order_id,),
+                )
+                row = cur.fetchone()
+
         if not row:
-            return {
-                "success": False,
-                "message": "查無此條碼，請確認是否輸入正確。"
-            }
+            raise HTTPException(status_code=404, detail="Order not found")
 
-        return {
-            "success": True,
-            "barcode": barcode,
-            "item_no": row["item_no"],
-            "product_name": row["product_name"],
-            "price_excl_tax": row["price_excl_tax"],
-            "unit": row["unit"]
-        }
+        return {"success": True, "row": row}
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail=f"DB query failed: {e}")
 
 
-@app.get("/api/search")
-def search_products(q: str, request: Request):
-    """商品模糊搜尋 API（依商品名稱關鍵字）"""
-    ensure_session(request)
-
-    query = (q or "").strip()
-    if not query:
-        raise HTTPException(status_code=400, detail="empty_query")
-
-    # 將全形逗號轉成半形，再依逗號與空白分割
-    normalized = query.replace("，", ",")
-    parts = [p.strip() for p in re.split(r"[\s,]+", normalized) if p.strip()]
-    if not parts:
-        raise HTTPException(status_code=400, detail="empty_query")
-
-    # 動態組 WHERE 條件：所有關鍵字都要出現在品名中
-    where_clauses = []
-    params = []
-    for kw in parts:
-        where_clauses.append("p.product_name LIKE ?")
-        params.append(f"%{kw}%")
-
-    where_sql = " AND ".join(where_clauses)
-
-    conn = get_db_connection()
+# 管理端：更新狀態
+@app.patch("/api/orders/{order_id}/status")
+def update_status(order_id: int, payload: UpdateStatusRequest):
     try:
-        cur = conn.cursor()
-        sql = f"""
-            SELECT
-                b.barcode,
-                p.product_name,
-                p.price_excl_tax,
-                p.unit
-            FROM product_barcodes b
-            JOIN products p ON p.id = b.product_id
-            WHERE {where_sql}
-            ORDER BY p.product_name
-            LIMIT 30
-        """
-        cur.execute(sql, params)
-        rows = cur.fetchall()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    update {ORDERS_TABLE}
+                    set status = %s
+                    where id = %s
+                    returning id, status
+                    """,
+                    (payload.status, order_id),
+                )
+                row = cur.fetchone()
+                conn.commit()
 
-        items = [
-            {
-                "barcode": row["barcode"],
-                "product_name": row["product_name"],
-                "price_excl_tax": row["price_excl_tax"],
-                "unit": row["unit"],
-            }
-            for row in rows
-        ]
+        if not row:
+            raise HTTPException(status_code=404, detail="Order not found")
 
-        if not items:
-            return {
-                "success": False,
-                "message": "查無符合的商品，請嘗試其他關鍵字。",
-                "items": [],
-            }
+        return {"success": True, **row}
 
-        return {"success": True, "items": items}
-
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        raise HTTPException(status_code=500, detail=f"DB update failed: {e}")
